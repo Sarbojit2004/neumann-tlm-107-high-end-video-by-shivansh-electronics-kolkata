@@ -1,0 +1,38 @@
+{
+  "name": "neumann-tlm107-reel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One 88-second vertical reel for the Neumann TLM 107 Studio Set.",
+  "scripts": {
+    "studio": "remotion studio",
+    "typecheck": "tsc --noEmit",
+    "audio": "python3 scripts/gen_audio.py && python3 scripts/audit_audio.py",
+    "media": "python3 scripts/prep_media.py",
+    "bootstrap": "npm run media && npm run audio",
+    "coverage": "node scripts/coverage.mjs",
+    "branding": "node scripts/branding_audit.mjs",
+    "stills": "node scripts/stills.mjs",
+    "verify": "node scripts/verify_render.mjs",
+    "bundlecheck": "node scripts/bundlecheck.mjs",
+    "thumb": "remotion still Thumbnail thumbnails/thumbnail-neumann-tlm107-reel.png --image-format=png",
+    "render": "remotion render Reel out/neumann-tlm107-reel.mp4 --codec=h264 --crf=17 --pixel-format=yuv420p"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.507",
+    "@remotion/cli": "4.0.507",
+    "@remotion/media-utils": "4.0.507",
+    "@remotion/renderer": "4.0.507",
+    "@remotion/transitions": "4.0.507",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.507"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "typescript": "5.6.3"
+  },
+  "remotion": {
+    "entry": "src/index.ts"
+  }
+}

@@ -1,0 +1,527 @@
+#!/usr/bin/env python3
+"""Builds the reel's two-layer audio bed.
+
+LAYER 1 -- the fixed background texture.
+    `sound-effects/ES_Moment - Christoffer Moe Ditlevsen.mp3` is a finished
+    creative input supplied with the project. It is used UNMODIFIED in
+    composition: this script only trims it to the reel length, applies a
+    fade in/out at the extreme ends and a single constant gain so it sits
+    under the voiceover. No EQ, no compression, no layering, no substitution,
+    no edit to its musical content. The source is 252.168 s, comfortably
+    longer than the 88 s reel, so it is never looped either.
+
+LAYER 2 -- the synthesised transition / foley palette.
+    Every cue below is generated from scratch here with numpy/scipy (biquad
+    filters, envelopes, modal resonator banks, comb reverb) and encoded with
+    ffmpeg. Nothing calls ElevenLabs or any other external audio service, and
+    nothing is taken from the video toolkit's bundled SFX tooling.
+
+    Per the creative brief's Section 10 the palette is deliberately narrow and
+    HIGH-FREQUENCY. Large cinematic low-frequency whooshes are excluded by
+    design -- they would muddy Layer 1. Everything here is a precise physical
+    sound: damped mechanical clicks, thin metallic grille resonances, and the
+    tight creak of stretched rubber.
+
+Run before any scene code references a cue name:
+
+    python3 scripts/gen_audio.py && python3 scripts/audit_audio.py
+"""
+import math
+import os
+import shutil
+import subprocess
+import sys
+import wave
+
+import numpy as np
+from scipy.signal import lfilter
+
+SR = 48000
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRATCH = os.environ.get("TLM107_WAV_DIR", os.path.join("/tmp", "tlm107_wav"))
+os.makedirs(SCRATCH, exist_ok=True)
+
+SFX_DIR = os.path.join(ROOT, "public", "audio", "sfx")
+BED_DIR = os.path.join(ROOT, "public", "audio")
+VO_DIR = os.path.join(ROOT, "public", "vo")
+for d in (SFX_DIR, BED_DIR, VO_DIR):
+    os.makedirs(d, exist_ok=True)
+
+# The one pre-supplied file. Layer 1. Never regenerated, never replaced.
+LAYER1_SRC = os.path.join(ROOT, "sound-effects", "ES_Moment - Christoffer Moe Ditlevsen.mp3")
+
+FPS = 30
+TOTAL_FRAMES = 2640
+REEL_SECONDS = TOTAL_FRAMES / FPS  # 88.0
+
+rng = np.random.default_rng(107)
+
+
+def find_ffmpeg() -> str:
+    env = os.environ.get("FFMPEG_BIN")
+    if env and os.path.exists(env):
+        return env
+    which = shutil.which("ffmpeg")
+    if which:
+        return which
+    for base in (
+        "/tmp/claude-0/-home-user/b7c7b719-b725-5bcc-ae76-95b988bf89e8/scratchpad",
+        ROOT,
+    ):
+        for cand in (
+            os.path.join(base, "node_modules", "ffmpeg-static", "ffmpeg"),
+            os.path.join(base, "node_modules", "@ffmpeg-installer", "linux-x64", "ffmpeg"),
+        ):
+            if os.path.exists(cand):
+                return cand
+    raise SystemExit("ffmpeg not found; set FFMPEG_BIN")
+
+
+FFMPEG = find_ffmpeg()
+
+
+# ---------------------------------------------------------------------------
+# DSP helpers
+# ---------------------------------------------------------------------------
+def t(n):
+    return np.arange(n) / SR
+
+
+def noise(n):
+    return rng.standard_normal(n)
+
+
+def _bq(fc, q, kind):
+    """Single biquad -> (b, a)."""
+    fc = float(np.clip(fc, 20.0, SR / 2 * 0.97))
+    w = 2 * math.pi * fc / SR
+    al = math.sin(w) / (2 * q)
+    c = math.cos(w)
+    if kind == "lp":
+        b = [(1 - c) / 2, 1 - c, (1 - c) / 2]
+    elif kind == "hp":
+        b = [(1 + c) / 2, -(1 + c), (1 + c) / 2]
+    elif kind == "bp":
+        b = [al, 0.0, -al]
+    else:
+        raise ValueError(kind)
+    a = [1 + al, -2 * c, 1 - al]
+    return np.array(b) / a[0], np.array(a) / a[0]
+
+
+def filt(x, fc, q=0.707, kind="lp"):
+    b, a = _bq(fc, q, kind)
+    return lfilter(b, a, x)
+
+
+def env_ad(n, attack, decay, curve=2.2):
+    """Percussive attack/decay envelope, times in seconds."""
+    a = max(1, int(attack * SR))
+    d = max(1, int(decay * SR))
+    e = np.zeros(n)
+    a = min(a, n)
+    e[:a] = np.linspace(0.0, 1.0, a) ** 0.6
+    rest = n - a
+    if rest > 0:
+        d = min(d, rest)
+        e[a : a + d] = np.linspace(1.0, 0.0, d) ** curve
+    return e
+
+
+def modal(n, freqs, decays, amps, excite=None):
+    """Bank of exponentially-decaying sine partials -- a struck rigid body."""
+    tt = t(n)
+    out = np.zeros(n)
+    for f, d, a in zip(freqs, decays, amps):
+        ph = rng.uniform(0, 2 * math.pi)
+        out += a * np.sin(2 * math.pi * f * tt + ph) * np.exp(-tt / d)
+    if excite is not None:
+        out = out + excite
+    return out
+
+
+def comb_verb(x, delays_ms=(11.3, 17.7, 23.1), fb=0.32, mix=0.18):
+    """Tiny room -- just enough to seat a cue in space. No long tail."""
+    out = x.copy()
+    for dm in delays_ms:
+        d = int(dm * SR / 1000)
+        buf = np.zeros(len(x))
+        if d < len(x):
+            buf[d:] = x[:-d]
+            fbuf = buf.copy()
+            for _ in range(3):
+                nb = np.zeros(len(x))
+                nb[d:] = fbuf[:-d] * fb
+                fbuf = nb
+                out = out + nb * mix
+            out = out + buf * mix
+    return out
+
+
+def norm(x, peak=0.89):
+    m = np.max(np.abs(x))
+    return x if m < 1e-9 else x * (peak / m)
+
+
+def stereo(x, width=0.16):
+    """Cheap Haas-ish widening. Kept subtle so cues stay centred and precise."""
+    d = int(width * 0.001 * SR) + 1
+    l = x.copy()
+    r = np.zeros(len(x))
+    r[d:] = x[:-d]
+    r = r * 0.985 + x * 0.015
+    return np.stack([l, r], axis=1)
+
+
+def write_wav(name, x, fade=0.004):
+    """x: mono 1-D or stereo (n,2)."""
+    if x.ndim == 1:
+        x = stereo(x)
+    n = len(x)
+    f = max(1, int(fade * SR))
+    f = min(f, n // 2)
+    ramp = np.ones(n)
+    ramp[:f] = np.linspace(0, 1, f)
+    ramp[-f:] = np.linspace(1, 0, f)
+    x = x * ramp[:, None]
+    x = np.clip(x, -1.0, 1.0)
+    path = os.path.join(SCRATCH, name + ".wav")
+    with wave.open(path, "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes((x * 32767).astype("<i2").tobytes())
+    return path
+
+
+def encode(wav_path, out_name, bitrate="192k"):
+    out = os.path.join(SFX_DIR, out_name + ".mp3")
+    subprocess.run(
+        [FFMPEG, "-y", "-loglevel", "error", "-i", wav_path, "-codec:a", "libmp3lame",
+         "-b:a", bitrate, "-ar", str(SR), out],
+        check=True,
+    )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# LAYER 2 CUES -- brief Section 10
+# ---------------------------------------------------------------------------
+
+def cue_toggle_click():
+    """Soft, damped mechanical click -- the rear navigation micro-joystick.
+
+    A detented switch inside a milled metal body: a very short broadband
+    contact transient, a small damped body 'tock', and essentially no ring.
+    """
+    n = int(0.085 * SR)
+    tt = t(n)
+    # contact transient -- filtered noise burst, very fast
+    burst = noise(n) * env_ad(n, 0.0004, 0.010, 3.4)
+    burst = filt(burst, 3800, 0.9, "hp")
+    burst = filt(burst, 9000, 0.7, "lp")
+    # damped body -- machined aluminium, tight
+    body = modal(
+        n,
+        freqs=[1420, 2180, 3260],
+        decays=[0.016, 0.011, 0.007],
+        amps=[0.55, 0.32, 0.18],
+    )
+    body *= env_ad(n, 0.0006, 0.045, 2.6)
+    # tiny low 'seat' so it feels physical, but kept above the mud zone
+    seat = np.sin(2 * math.pi * 320 * tt) * env_ad(n, 0.001, 0.020, 3.0) * 0.16
+    x = burst * 0.72 + body * 0.62 + seat
+    x = filt(x, 180, 0.7, "hp")          # keep Layer 1's low end clear
+    return norm(comb_verb(x, fb=0.18, mix=0.08), 0.80)
+
+
+def cue_toggle_click_soft():
+    """Quieter sibling of the above, for rapid multi-step LED stepping."""
+    n = int(0.062 * SR)
+    burst = noise(n) * env_ad(n, 0.0004, 0.007, 3.6)
+    burst = filt(burst, 4600, 0.9, "hp")
+    burst = filt(burst, 10500, 0.7, "lp")
+    body = modal(n, [1680, 2560], [0.011, 0.008], [0.42, 0.24])
+    body *= env_ad(n, 0.0006, 0.030, 2.8)
+    x = burst * 0.60 + body * 0.50
+    x = filt(x, 220, 0.7, "hp")
+    return norm(comb_verb(x, fb=0.15, mix=0.06), 0.62)
+
+
+def cue_grille_tap(seed_shift=0.0, bright=1.0, length=0.34, peak=0.72):
+    """Gentle finger-tap on a rigid woven mesh grille -- the transition sound.
+
+    High, thin, slightly inharmonic metal partials over a fast noise chiff.
+    Deliberately small: it should cut through, not sweep.
+    """
+    n = int(length * SR)
+    base = 2740 * (1.0 + seed_shift)
+    # inharmonic ratios -- a woven mesh is not a tuned bar
+    ratios = [1.0, 1.51, 2.13, 2.87, 3.94, 5.21]
+    amps = [1.0, 0.58, 0.40, 0.27, 0.17, 0.10]
+    decays = [0.115, 0.088, 0.069, 0.052, 0.038, 0.027]
+    body = modal(
+        n,
+        freqs=[base * r * bright for r in ratios],
+        decays=decays,
+        amps=amps,
+    )
+    body *= env_ad(n, 0.0008, length * 0.92, 1.9)
+    chiff = noise(n) * env_ad(n, 0.0003, 0.008, 4.0)
+    chiff = filt(chiff, 5200, 0.8, "hp")
+    x = body * 0.66 + chiff * 0.30
+    x = filt(x, 900, 0.7, "hp")          # nothing below ~900 Hz at all
+    return norm(comb_verb(x, delays_ms=(7.9, 13.1, 19.3), fb=0.30, mix=0.20), peak)
+
+
+def cue_grille_tap_hi():
+    # shorter + brighter cues concentrate their energy, so they need a lower
+    # ceiling to land at the same perceived level against the bed
+    return cue_grille_tap(seed_shift=0.22, bright=1.18, length=0.28, peak=0.42)
+
+
+def cue_grille_tap_lo():
+    return cue_grille_tap(seed_shift=-0.18, bright=0.86, length=0.42)
+
+
+def cue_grille_shimmer():
+    """Several mesh taps smeared into a soft metallic wash for scene changes.
+
+    Still band-limited well above Layer 1's musical body.
+    """
+    n = int(0.85 * SR)
+    x = np.zeros(n)
+    for k in range(7):
+        s = cue_grille_tap(seed_shift=rng.uniform(-0.3, 0.35),
+                           bright=rng.uniform(0.9, 1.25), length=0.40)
+        s = s[:, 0] if s.ndim > 1 else s
+        off = int(rng.uniform(0.0, 0.34) * SR)
+        seg = min(len(s), n - off)
+        if seg > 0:
+            x[off : off + seg] += s[:seg] * rng.uniform(0.30, 0.62)
+    x = filt(x, 1200, 0.7, "hp")
+    x *= env_ad(n, 0.010, 0.80, 1.5)
+    return norm(comb_verb(x, delays_ms=(9.7, 15.3, 22.9), fb=0.34, mix=0.24), 0.66)
+
+
+def cue_rubber_stretch():
+    """Thick rubber elasticity stretching -- the EA 4 suspension bands.
+
+    Rubber under tension creates stick-slip: a dense train of micro-events
+    whose rate and filter frequency rise as the band tightens. Tight, faint,
+    and short -- never a groan.
+    """
+    n = int(0.62 * SR)
+    tt = t(n)
+    tension = np.clip(tt / (n / SR), 0, 1) ** 0.75
+    # stick-slip micro-impulses, accelerating
+    imp = np.zeros(n)
+    pos = 0.0
+    while pos < n:
+        i = int(pos)
+        if i < n:
+            imp[i] += rng.uniform(0.45, 1.0)
+        rate = 190.0 + 700.0 * (pos / n) ** 0.9
+        pos += SR / rate
+    # resonant band that climbs with tension -> the 'creak' pitch rising
+    seg = 1024
+    out = np.zeros(n)
+    for s0 in range(0, n, seg):
+        s1 = min(n, s0 + seg)
+        fc = 620 + 1500 * tension[s0]
+        out[s0:s1] = filt(imp[s0:s1], fc, 5.5, "bp")
+    # breathy air from the band surface
+    air = filt(noise(n), 3200, 0.8, "hp") * 0.10 * tension
+    x = out * 0.85 + air
+    x *= env_ad(n, 0.035, 0.52, 1.5)
+    x = filt(x, 300, 0.7, "hp")
+    return norm(comb_verb(x, fb=0.22, mix=0.12), 0.38)
+
+
+def cue_rubber_settle():
+    """The band releasing and settling -- reverse-ish of the stretch, shorter."""
+    n = int(0.40 * SR)
+    tt = t(n)
+    relax = 1.0 - np.clip(tt / (n / SR), 0, 1) ** 0.8
+    imp = np.zeros(n)
+    pos = 0.0
+    while pos < n:
+        i = int(pos)
+        if i < n:
+            imp[i] += rng.uniform(0.35, 0.9)
+        rate = 620.0 - 400.0 * (pos / n)
+        pos += SR / max(60.0, rate)
+    seg = 1024
+    out = np.zeros(n)
+    for s0 in range(0, n, seg):
+        s1 = min(n, s0 + seg)
+        fc = 480 + 900 * relax[s0]
+        out[s0:s1] = filt(imp[s0:s1], fc, 5.0, "bp")
+    x = out * env_ad(n, 0.006, 0.36, 2.0)
+    x = filt(x, 280, 0.7, "hp")
+    return norm(comb_verb(x, fb=0.20, mix=0.10), 0.36)
+
+
+def cue_led_step():
+    """Tiny high tick marking one LED advancing on the pattern ring."""
+    n = int(0.045 * SR)
+    tt = t(n)
+    tone = (np.sin(2 * math.pi * 5200 * tt) * 0.6
+            + np.sin(2 * math.pi * 7900 * tt) * 0.3)
+    tone *= env_ad(n, 0.0004, 0.026, 3.2)
+    chiff = filt(noise(n), 6500, 0.9, "hp") * env_ad(n, 0.0002, 0.005, 4.0) * 0.35
+    x = tone + chiff
+    x = filt(x, 1500, 0.7, "hp")
+    return norm(x, 0.52)
+
+
+def cue_focus_settle():
+    """Airy 'lock' at the end of a macro-to-reveal pull-back.
+
+    A short filtered-noise breath that resolves onto a faint high partial --
+    reads as focus arriving, without any low-frequency whoosh content.
+    """
+    n = int(0.70 * SR)
+    tt = t(n)
+    sweep = np.exp(np.linspace(math.log(1800), math.log(6400), n))
+    ph = np.cumsum(2 * math.pi * sweep / SR)
+    air = filt(noise(n), 2400, 0.7, "hp")
+    air *= env_ad(n, 0.10, 0.58, 1.4) * 0.34
+    tone = np.sin(ph) * env_ad(n, 0.14, 0.52, 2.0) * 0.16
+    tail = (np.sin(2 * math.pi * 4180 * tt) * 0.5
+            + np.sin(2 * math.pi * 6270 * tt) * 0.24)
+    tail *= env_ad(n, 0.30, 0.36, 2.2) * 0.20
+    x = air + tone + tail
+    x = filt(x, 1100, 0.7, "hp")
+    return norm(comb_verb(x, fb=0.30, mix=0.20), 0.42)
+
+
+def cue_finish_wipe():
+    """Nickel<->black finish split. A thin metallic edge passing the frame.
+
+    Band-limited noise sweeping UP through the treble only -- explicitly not
+    a cinematic whoosh; there is no energy below ~1.2 kHz.
+    """
+    n = int(0.50 * SR)
+    x = filt(noise(n), 1400, 0.8, "hp")
+    seg = 512
+    out = np.zeros(n)
+    for s0 in range(0, n, seg):
+        s1 = min(n, s0 + seg)
+        p = s0 / n
+        fc = 2200 + 7000 * (p ** 1.3)
+        out[s0:s1] = filt(x[s0:s1], fc, 3.2, "bp")
+    out *= env_ad(n, 0.06, 0.40, 1.6)
+    edge = modal(n, [3300, 4950], [0.05, 0.035], [0.35, 0.20])
+    edge *= env_ad(n, 0.16, 0.24, 2.4)
+    y = out * 0.8 + edge * 0.5
+    y = filt(y, 1200, 0.7, "hp")
+    return norm(comb_verb(y, fb=0.26, mix=0.16), 0.44)
+
+
+def cue_spec_mark():
+    """Precise marker under a hard verified figure appearing (141 dB / 10 dB-A)."""
+    n = int(0.22 * SR)
+    tt = t(n)
+    tone = (np.sin(2 * math.pi * 3140 * tt) * 0.55
+            + np.sin(2 * math.pi * 4710 * tt) * 0.26
+            + np.sin(2 * math.pi * 6280 * tt) * 0.12)
+    tone *= env_ad(n, 0.0012, 0.19, 2.6)
+    tick = filt(noise(n), 7000, 0.9, "hp") * env_ad(n, 0.0002, 0.004, 4.0) * 0.30
+    x = tone + tick
+    x = filt(x, 1400, 0.7, "hp")
+    return norm(comb_verb(x, fb=0.24, mix=0.14), 0.50)
+
+
+def cue_outro_chime():
+    """Closing mark over the CTA. Bright, brief, unhurried -- no low swell."""
+    n = int(1.30 * SR)
+    tt = t(n)
+    parts = [(2093, 0.62, 0.50), (2637, 0.54, 0.30), (3136, 0.46, 0.20),
+             (4186, 0.38, 0.12), (5274, 0.30, 0.07)]
+    x = np.zeros(n)
+    for f, d, a in parts:
+        x += a * np.sin(2 * math.pi * f * tt + rng.uniform(0, 6.28)) * np.exp(-tt / d)
+    x *= env_ad(n, 0.006, 1.24, 1.25)
+    air = filt(noise(n), 5000, 0.8, "hp") * env_ad(n, 0.004, 0.10, 3.0) * 0.13
+    y = x + air
+    y = filt(y, 1000, 0.7, "hp")
+    return norm(comb_verb(y, delays_ms=(13.1, 21.7, 29.3), fb=0.36, mix=0.26), 0.62)
+
+
+CUES = {
+    "toggle-click": cue_toggle_click,
+    "toggle-click-soft": cue_toggle_click_soft,
+    "led-step": cue_led_step,
+    "grille-tap": cue_grille_tap,
+    "grille-tap-hi": cue_grille_tap_hi,
+    "grille-tap-lo": cue_grille_tap_lo,
+    "grille-shimmer": cue_grille_shimmer,
+    "rubber-stretch": cue_rubber_stretch,
+    "rubber-settle": cue_rubber_settle,
+    "focus-settle": cue_focus_settle,
+    "finish-wipe": cue_finish_wipe,
+    "spec-mark": cue_spec_mark,
+    "outro-chime": cue_outro_chime,
+}
+
+
+# ---------------------------------------------------------------------------
+# LAYER 1 -- trim the supplied track. Composition untouched.
+# ---------------------------------------------------------------------------
+def build_layer1():
+    if not os.path.exists(LAYER1_SRC):
+        raise SystemExit(f"Layer 1 source missing: {LAYER1_SRC}")
+    out = os.path.join(BED_DIR, "bed-layer1.mp3")
+    # Trim to 88 s + short musical fades at the extreme ends, and one constant
+    # -15 dB gain so it sits beneath narration. Nothing else is applied.
+    subprocess.run(
+        [FFMPEG, "-y", "-loglevel", "error",
+         "-i", LAYER1_SRC,
+         "-t", f"{REEL_SECONDS:.3f}",
+         "-af", f"volume=-15dB,afade=t=in:st=0:d=1.2,"
+                f"afade=t=out:st={REEL_SECONDS - 2.4:.3f}:d=2.4",
+         "-codec:a", "libmp3lame", "-b:a", "224k", "-ar", str(SR),
+         out],
+        check=True,
+    )
+    return out
+
+
+def build_silent_vo():
+    """Silent placeholder so the composition renders before VO is recorded."""
+    out = os.path.join(VO_DIR, "voiceover-reel.mp3")
+    if os.path.exists(out):
+        return out
+    subprocess.run(
+        [FFMPEG, "-y", "-loglevel", "error",
+         "-f", "lavfi", "-i", f"anullsrc=r={SR}:cl=stereo",
+         "-t", f"{REEL_SECONDS:.3f}",
+         "-codec:a", "libmp3lame", "-b:a", "96k", out],
+        check=True,
+    )
+    return out
+
+
+def main():
+    print(f"ffmpeg: {FFMPEG}")
+    print("\n-- LAYER 1 (supplied, unmodified composition) --")
+    p = build_layer1()
+    print(f"   {os.path.relpath(p, ROOT)}")
+
+    print("\n-- LAYER 2 (synthesised here, numpy/scipy) --")
+    for name, fn in CUES.items():
+        x = fn()
+        wav = write_wav(name, x)
+        mp3 = encode(wav, name)
+        kb = os.path.getsize(mp3) // 1024
+        print(f"   {name:<20} {kb:>4} KB")
+
+    print("\n-- VO placeholder --")
+    v = build_silent_vo()
+    print(f"   {os.path.relpath(v, ROOT)}")
+    print(f"\nDone. {len(CUES)} Layer 2 cues.")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
