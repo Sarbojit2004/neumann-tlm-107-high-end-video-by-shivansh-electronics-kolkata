@@ -1,8 +1,14 @@
-# Asset Ledger — Neumann TLM 107 Studio Set reel
+# Asset Ledger — Neumann TLM 107 Studio Set
 
 Every image in this repository, what it actually shows, and where it appears
-in the 88-second reel. Generated and enforced by `npm run coverage`, which
-fails the build if any image goes unplaced.
+in **both** deliverables — the 88-second reel and the 298-second long-form
+video. Enforced by `npm run coverage` and `npm run coverage:lf`, which fail the
+build if any image goes unplaced.
+
+The two coverage requirements are **independent, not a shared pool**: a viewer
+who watches only the reel must see all 55 images, and so must a viewer who
+watches only the long-form. Both audits therefore run against all 55
+separately.
 
 ---
 
@@ -102,6 +108,8 @@ implying a catalogue or an ecosystem.
 
 ## 3. Treatment distribution
 
+### Reel (88 s)
+
 | Treatment | Count | What it is |
 |---|---:|---|
 | **HERO-REVEAL** | 3 | Full Macro-to-Full-Reveal: extreme macro with simulated shallow DOF, dolly-style pull back as focus expands, resolving to the complete uncropped product, then a slow interactive hold. 35 % macro / 65 % reveal-and-hold per brief Section 6. |
@@ -113,13 +121,32 @@ implying a catalogue or an ecosystem.
 Images receiving the full HERO-REVEAL: `macro-grille` (S1 opening hook),
 `macro-xlr` (S3), `macro-badge-lo2` (S6 close).
 
+### Long-form (298 s)
+
+Same primitives, more room. The distribution is flatter — landscape and 3.4×
+the runtime mean far more images get genuine sequential hero treatment instead
+of montage:
+
+| Treatment | Count |
+|---|---:|
+| HERO-REVEAL | 3 |
+| INTERFACE | 1 |
+| FLEX | 2 |
+| GIMBAL | 19 |
+| STATIC | 6 |
+| AMBIENT | 24 |
+
+The closing Macro-to-Full-Reveal runs a full **12 seconds** at the brief's
+35 % macro / 65 % reveal-and-hold ratio — where the reel's had to fit inside
+13 seconds total including the whole CTA.
+
 **The complete product is always shown fully and legibly at some point during
 every image's screen time.** Every camera primitive resolves through scale 1.0
 with zero offset — no image is ever left permanently cropped or clipped.
 
 ---
 
-## 4. Scene-by-scene placement
+## 4. Scene-by-scene placement — reel
 
 Timing follows the brief's Section 12 allocation for the 88-second reel exactly.
 
@@ -137,6 +164,67 @@ cross-fading across each scene's duration: 6 × 4 = 24.
 
 ---
 
+## 4b. Chapter-by-chapter placement — long-form
+
+Timing follows the brief's Section 12 allocation for the 298-second video
+exactly.
+
+| Chapter | Frames | Time | Images |
+|---|---|---|---|
+| **C1** The versatility problem | 0–750 | 0:00–0:25 | `macro-grille` (reveal), `room-real`, `nickel-front` |
+| **C2** Capsule and five patterns | 750–2250 | 0:25–1:15 | `mesh-abstract`, `rear-nickel` (interface), `polar-diagram`, `nickel-tall` |
+| **C3** Engineering and interface | 2250–3600 | 1:15–2:00 | `macro-xlr` (reveal), `black-front`, `nav-labelled`, `rear-black-ang`, `rear-black-lo`, `rear-black-sm` |
+| **C4** The Studio Set / EA 4 | 3600–4800 | 2:00–2:40 | `ea4-nickel` (flex), `ea4-black` (flex), `ea4-exploded`, `nickel-stand`, `black-ea4-a`, `black-ea4-b` |
+| **C5** Heritage and finish | 4800–6300 | 2:40–3:30 | `studio-sepia`, `macro-badge-blk` (reveal), `nickel-tall`/`black-tall` (finish split), `macro-badge-lo`, `macro-badge-lo2`, `nickel-angled`, `black-dark`, `macro-badge-ang` |
+| **C6** Transformation and proof | 6300–7800 | 3:30–4:20 | `nickel-swivel`, `room-real`, `nickel-patchbay`, `black-ea4-sm`, `rear-black` |
+| **C7** Price and CTA | 7800–8940 | 4:20–4:58 | `macro-grille` (12 s reveal), `nickel-front` |
+
+Ambient plates: three to four per chapter, cross-fading across the chapter, as
+a full-bleed background wash rather than the reel's narrow bands — landscape
+has no exclusion zone to hide them in. 7 chapters × 3–4 = 24.
+
+---
+
+## 4c. Branding cadence — long-form only
+
+The reel deliberately uses **neither** logo. The long-form uses **both**,
+repeatedly. `npm run cadence` produces this list and fails on a violation.
+
+**Shivansh Electronics — 18 appearances**, longest gap **29.0 s** (limit 40 s),
+every chapter covered, rotating through three forms:
+
+| Form | Where |
+|---|---|
+| corner mark | top-right during hero shots |
+| lower third | bottom-left under technical explanations |
+| full band | across the reserved band between segments |
+
+**Neumann — 5 appearances**, at 00:01.5, 00:39.0, 02:42.0, 03:58.0 and 04:32.0
+— present throughout including mid-video, but noticeably less frequent than
+Shivansh, as the spec requires.
+
+**Primary URL:** `www.shivanshelectronics.in` appears **10 times** on screen
+against 1 for the full product-page URL and 1 for the Linktree hub — genuinely
+the most-repeated single destination. The full product-page URL is shown once,
+in the outro, where a viewer has time to read it.
+
+### Logo preparation
+
+Both supplied files ship with an opaque white rounded-rectangle plate baked in,
+which the spec forbids ("not enclosed in a white box, card, or plate"), and the
+Shivansh file carries the tagline "Eastern India's Premier Audio Destination",
+which the spec also excludes.
+
+`scripts/prep_logos.py` fixes both. The plate is keyed to transparency using
+only white regions **connected to the image border**, so white enclosed inside
+the artwork — the Neumann diamond's interior, the counters inside letterforms —
+survives intact. The tagline is cropped at the measured gap between the
+wordmark and the tagline (the ink profile of the wordmark column shows three
+bands: "Shivansh" at y 0–236, "Electronics" at y 295–456, tagline at y
+551–714; the cut is at 0.70). What remains is a complete, standard logo lockup.
+
+---
+
 ## 5. Audio
 
 **Layer 1 — fixed, pre-supplied, unmodified.**
@@ -151,8 +239,20 @@ The folder also contains four **stems** of that same track and a **1-byte
 placeholder** named `sfx music`. The brief describes one pre-supplied file;
 the full mix is that file, and the stems are left unused.
 
-**Layer 2 — 13 cues, synthesised from scratch** by `scripts/gen_audio.py` with
-numpy/scipy. No ElevenLabs, no external audio service, nothing from the video
+**Layer 1 for the long-form LOOPS.** This is the one place the two deliverables
+genuinely differ. The 252.168 s source covers the 88 s reel outright but falls
+45.8 s short of 298 s. A butt join would put an audible seam in the middle of
+the video, so the join is a **3 s equal-power crossfade**: the track plays 0 →
+250 s, then crossfades into itself from 150 s and runs 51 s more.
+250 + 51 − 3 = 298.000 s exactly. Still no EQ, no compression, no layering, no
+substitution — a cut, a crossfade between two passages of the same recording,
+one constant gain and end fades. The audit verifies the first pass against the
+source (**r = 0.99990**) and confirms the seam does not dip.
+
+**Layer 2 — 22 cues, synthesised from scratch** by `scripts/gen_audio.py` with
+numpy/scipy. The reel uses 13; the long-form uses all 22, because at three and
+a half times the runtime the original thirteen would have become audibly
+repetitive. No ElevenLabs, no external audio service, nothing from the video
 toolkit's bundled SFX tooling. Per brief Section 10 the palette is deliberately
 narrow and high-frequency; the audit **fails any cue putting more than 8 % of
 its energy below 300 Hz**, which is what would muddy Layer 1. Measured: every
@@ -164,3 +264,17 @@ cue is at **0.0–1.0 %**.
 | Metallic grille resonances (transitions) | `grille-tap`, `grille-tap-hi`, `grille-tap-lo`, `grille-shimmer` |
 | Thick rubber elasticity (EA 4 suspension) | `rubber-stretch`, `rubber-settle` |
 | Optical / editorial marks | `focus-settle`, `finish-wipe`, `spec-mark`, `outro-chime` |
+| **Long-form additions** | `grille-tap-mid`, `grille-tap-soft`, `toggle-click-hard`, `chapter-mark`, `spec-tick`, `rubber-short`, `air-lift`, `panel-slide`, `pattern-morph` |
+
+### Separate SFX stems
+
+Each video also ships its transition layer as one full-length stem with the
+background silenced and every cue at its exact frame position, so it can be
+re-levelled by hand against a voiceover and still lock to picture:
+
+| Stem | Length | Cue instances |
+|---|---|---|
+| `out/neumann-tlm107-transition-sfx-timeline.mp3` | 88.000 s | 52 |
+| `out/neumann-tlm107-longform-transition-sfx-timeline.mp3` | 298.000 s | 104 |
+
+Neither is loudness-normalised; peaks are left where they fall.

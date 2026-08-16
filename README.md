@@ -1,17 +1,28 @@
-# Neumann TLM 107 Studio Set — 88-second reel
+# Neumann TLM 107 Studio Set — reel + long-form video
 
-A single standalone vertical reel for the Neumann TLM 107 Studio Set, built
-with Remotion. **1080×1920, 30 fps, exactly 2,640 frames (88.000 s).**
+Two standalone deliverables for the Neumann TLM 107 Studio Set, built with
+Remotion from one shared codebase so they read as a single campaign.
+
+| | Reel | Long-form |
+|---|---|---|
+| Canvas | 1080×1920 portrait | 1920×1080 landscape |
+| Length | 2,640 frames — **88.000 s** | 8,940 frames — **298.000 s** |
+| Logos | **neither**, by design | **both**, repeatedly |
+| Layout | Instagram safe zones | full frame, 48 px side inset |
 
 Presented by **Shivansh Electronics — Neumann's Authorized Partner**, Kolkata.
 
 | Deliverable | Path |
 |---|---|
-| Final render | `out/neumann-tlm107-reel.mp4` |
+| Reel render | `out/neumann-tlm107-reel.mp4` |
+| Long-form render | `out/neumann-tlm107-longform.mp4` |
 | Portrait thumbnail | `thumbnails/thumbnail-neumann-tlm107-reel.png` |
-| Voiceover script | `VO_SCRIPT_REEL_NEUMANN_TLM107.md` |
+| Landscape thumbnail | `thumbnails/thumbnail-neumann-tlm107-longform.png` |
+| Reel voiceover script | `VO_SCRIPT_REEL_NEUMANN_TLM107.md` |
+| Long-form voiceover script | `VO_SCRIPT_LONGFORM_NEUMANN_TLM107.md` |
 | Asset ledger (all 55 images) | `ASSET_LEDGER.md` |
 | Reproducible project zip | `neumann-tlm107-reel-project.zip` |
+| Separate SFX stems | `out/*-transition-sfx-timeline.mp3`, `public/audio/bed-layer1*.mp3` |
 
 ---
 
@@ -23,15 +34,19 @@ Requires **Node 18+**, **Python 3.9+** and **ffmpeg** on `PATH`.
 npm install
 pip install numpy scipy Pillow
 
-npm run bootstrap      # prepare all 55 images + build the two-layer audio bed
-npm run render         # → out/neumann-tlm107-reel.mp4
-node scripts/finalize.mjs   # hard-trim the container to exactly 88.000 s
+npm run bootstrap      # prepare all 55 images + both logos + the audio layers
+npm run render         # → out/neumann-tlm107-reel.mp4      (88 s portrait)
+node scripts/finalize.mjs   # hard-trim the reel container to exactly 88.000 s
+
+npm run render:lf      # → out/neumann-tlm107-longform.mp4  (298 s landscape)
+npm run thumb          # portrait thumbnail
+npm run thumb:lf       # landscape thumbnail
 ```
 
-`npm run bootstrap` is `prep_media.py` followed by `gen_audio.py` +
-`audit_audio.py`. Both write into `public/`, which is gitignored — the pipeline
-is fully reproducible from the repository's source images and the supplied
-audio file.
+`npm run bootstrap` runs `prep_media.py`, `prep_logos.py`, then `gen_audio.py`
++ `audit_audio.py`. All write into `public/`, which is gitignored — the pipeline
+is fully reproducible from the repository's source images, the two logo files
+and the supplied audio file.
 
 Preview interactively with `npm run studio`.
 
@@ -53,14 +68,24 @@ npm run typecheck     # tsc --noEmit
 npm run bundlecheck   # bundles + asserts 1080x1920 @30fps, 2640 frames
 npm run media         # re-prepares images, asserts all 55 accounted for
 npm run audio         # rebuilds + audits the two audio layers
-npm run coverage      # asserts all 55 images reach the reel; reports treatment
-npm run branding      # asserts every content rule holds
+npm run coverage      # asserts all 55 images reach the REEL; reports treatment
+npm run coverage:lf   # asserts all 55 reach the LONG-FORM, independently
+npm run cadence       # timestamped branding-appearance list + gap enforcement
+npm run branding      # asserts every content rule holds, across both scripts
 npm run stills        # renders checkpoint frames to stills/ for visual review
 npm run verify        # probes the finished MP4 on disk
 ```
 
-**`npm run coverage`** maps each of the 55 images to the scene it appears in and
-the camera treatment it received, and fails if anything is unplaced.
+**`npm run coverage` / `npm run coverage:lf`** map each of the 55 images to the
+scene it appears in and the camera treatment it received, and fail if anything
+is unplaced. The two coverage requirements are **independent**, not a shared
+pool: a viewer who only watches the reel sees all 55, and so does a viewer who
+only watches the long-form.
+
+**`npm run cadence`** prints the timestamped list of every branding appearance
+in the long-form and fails on a violation — a Shivansh gap over 40 s, a chapter
+with no Shivansh beat, Neumann appearing only at the open and close, or any URL
+out-repeating `www.shivanshelectronics.in`.
 
 **`npm run branding`** statically enforces: no logo file referenced anywhere; no
 competing microphone brand; no other Neumann product (the historic M 49 is the
@@ -79,37 +104,64 @@ cue decodes, is unclipped, and keeps ≤ 8 % of its energy below 300 Hz.
 
 ```
 src/
-  Root.tsx            compositions: Reel (2640f) + Thumbnail (1f)
-  Reel.tsx            scene assembly + the whole audio bed
-  Thumbnail.tsx       1080x1920 portrait thumbnail
-  scenes/             S1Hook · S2Patterns · S3Control · S4StudioSet · S5Heritage · S6Cta
+  Root.tsx              4 compositions: Reel, Thumbnail, Longform, LongformThumbnail
+  Reel.tsx              88 s portrait assembly + its audio bed
+  Longform.tsx          298 s landscape assembly + its audio bed
+  Thumbnail.tsx         1080x1920 portrait thumbnail
+  LongformThumbnail.tsx 1920x1080 landscape thumbnail
+  scenes/               REEL:      S1Hook · S2Patterns · S3Control ·
+                                   S4StudioSet · S5Heritage · S6Cta
+  scenes/lf/            LONG-FORM: C1Problem · C2Patterns · C3Engineering ·
+                                   C4StudioSet · C5Heritage · C6Proof · C7Cta
   components/
-    Stage.tsx         light ground, safe-zone Bands, ambient plate bands, grid
-    Media.tsx         Shot / GimbalShot / RevealShot / FlexShot
-    Diagram.tsx       polar diagram, LED ring overlay, nav toggle, heritage motif
-    Type.tsx          Display · Kicker · Sub · Body · Spec · Micro · KineticLine
-    Cue.tsx           Layer 2 cue placement
+    Stage.tsx           reel ground, safe-zone Bands, ambient plate bands, grid
+    Media.tsx           Shot / GimbalShot / RevealShot / FlexShot (shared)
+    Diagram.tsx         polar diagram, LED ring overlay, heritage motif (shared)
+    Type.tsx            Display · Kicker · Sub · Body · Spec · Micro (shared)
+    Cue.tsx             Layer 2 cue placement (shared)
+    lf/LFStage.tsx      landscape ground, ambient wash, the branding forms
+    lf/LFLayouts.tsx    Split · Hero · Trio · Stat · Title beat vocabulary
   lib/
-    theme.ts          palette, safe-zone geometry, layout bands, scene table
-    anim.ts           the four camera primitives + crossfade helpers
-    images.ts         the 31 product frames and 24 ambient plates
-    copy.ts           every on-screen string
-    sfx.ts            the 13 synthesised cues + the fixed bed
-    fonts.ts          base64-inlined face registration
+    theme.ts            palette, reel geometry, reel scene table
+    lf-theme.ts         landscape geometry, branding band, chapter table
+    lf-brand.ts         the declarative branding cadence
+    anim.ts             the camera primitives + crossfade helpers (shared)
+    images.ts           the 31 product frames and 24 ambient plates
+    copy.ts             every on-screen string
+    sfx.ts              22 synthesised cues + both fixed beds
+    fonts.ts            base64-inlined face registration
 scripts/
-  prep_media.py       classifies + prepares all 55 images
-  gen_audio.py        trims Layer 1; synthesises all of Layer 2
-  audit_audio.py      validates the two-layer pipeline
-  embed_fonts.py      regenerates src/lib/font-data.ts
-  coverage.mjs        asset-coverage ledger
-  branding_audit.mjs  content-rule enforcement
-  bundlecheck.mjs     bundler + composition check
-  stills.mjs          checkpoint still renders
-  verify_render.mjs   probes the finished MP4
-  finalize.mjs        hard-trims the container to 88.000 s
+  prep_media.py                  classifies + prepares all 55 images
+  prep_logos.py                  keys the white plate off both logos
+  gen_audio.py                   both Layer 1 beds; synthesises all 22 cues
+  audit_audio.py                 validates the two-layer pipeline
+  embed_fonts.py                 regenerates src/lib/font-data.ts
+  coverage.mjs                   reel asset-coverage ledger
+  coverage_lf.mjs                long-form ledger, independent of the reel
+  branding_cadence.mjs           timestamped branding audit
+  branding_audit.mjs             content-rule enforcement
+  bundlecheck.mjs                bundler + composition check
+  stills.mjs                     checkpoint still renders
+  verify_render.mjs              probes a finished MP4
+  finalize.mjs                   hard-trims a container to an exact duration
+  build_transition_timeline.py   88 s transition-only stem
+  build_transition_timeline_lf.py 298 s transition-only stem
+  pack_project.py                the reproducible project zip
 ```
 
-### Format
+### Long-form format
+
+No reserved caption box and no top/bottom exclusion zone — content uses the
+full frame, with a 48 px inset on the left and right for anything critical.
+
+A **156 px branding band** is reserved along the bottom. The branding cadence
+is mounted once at composition level so its timing cannot drift as chapters
+change, which means it renders over whatever chapter is playing; reserving the
+band is what stops lower-thirds landing on body copy and trio captions. Every
+beat composes inside `SAFE`, which already excludes it. The outro is the one
+exception — it *is* the branding moment, so it uses the full height.
+
+### Reel format
 
 Light background throughout all 88 seconds, with Instagram safe-zone geometry:
 
@@ -153,16 +205,61 @@ Micro-Movement, Interface Sequence, Suspension Flex, and Macro-to-Full-Reveal,
 plus the Finish Split wipe. All resolve through scale 1.0, so the complete
 product is always shown fully and legibly during every image's screen time.
 
+The long-form lets them breathe: its closing Macro-to-Full-Reveal runs a full
+12 seconds at the brief's 35 % macro / 65 % reveal-and-hold ratio, and its
+Interface Sequence pairs with a genuine per-pattern explanation rather than the
+reel's necessarily faster cycling.
+
+### Branding — opposite by design
+
+The **reel deliberately uses neither logo**; they are added by hand afterwards.
+The **long-form uses both, repeatedly**, with Shivansh Electronics appearing
+roughly every 20–28 s across three rotating forms (corner mark, lower third,
+full band) and Neumann five times including mid-video.
+
+Both supplied logo files ship with a baked white rounded-rectangle plate, and
+the Shivansh file carries a tagline. The spec forbids both, so
+`scripts/prep_logos.py` keys the plate to transparency — only white *connected
+to the border*, so white inside the artwork survives — and crops the tagline at
+the measured gap between wordmark and tagline. Every logo therefore renders
+directly on the ground, never boxed.
+
 ### Sound
 
 Two strictly separated layers. Layer 1 is the supplied background texture, used
-unmodified. Layer 2 is 13 cues synthesised from scratch with numpy/scipy —
+unmodified. Layer 2 is **22 cues** synthesised from scratch with numpy/scipy —
 damped mechanical clicks, thin metallic grille resonances, and tight rubber
-elasticity — deliberately high-frequency so nothing competes with Layer 1.
+elasticity — deliberately high-frequency so nothing competes with Layer 1. The
+reel uses 13 of them; the long-form uses all 22, because at three and a half
+times the runtime the original set would have become audibly repetitive.
+
+**The long-form bed loops; the reel's does not.** The supplied track runs
+252.168 s — enough to cover 88 s outright, but 45.8 s short of 298 s. A butt
+join would put an audible seam mid-video, so `gen_audio.py` joins it with a 3 s
+equal-power crossfade (250 s + 51 s − 3 s = 298.000 s). `audit_audio.py`
+verifies the first pass against the source and checks the seam does not dip.
+
 See `ASSET_LEDGER.md` §5.
 
-`public/vo/voiceover-reel.mp3` is a **silent 88.000 s placeholder**. Drop the
-recorded narration in at that path and re-render.
+`public/vo/voiceover-reel.mp3` and `voiceover-longform.mp3` are **silent
+placeholders** at exactly 88.000 s and 298.000 s. Drop the recorded narration in
+at those paths and re-render.
+
+#### Separate SFX stems
+
+For manual re-levelling against a recorded voiceover, each video has its
+transition layer isolated into one full-length stem — background silenced,
+every cue at its exact frame position, so it drops onto the timeline at 0:00
+and locks to picture:
+
+```bash
+python3 scripts/build_transition_timeline.py      # → 88 s stem
+python3 scripts/build_transition_timeline_lf.py   # → 298 s stem
+```
+
+The Layer 1 beds ship separately at `public/audio/bed-layer1.mp3` and
+`bed-layer1-longform.mp3`. Neither stem is loudness-normalised — peaks are left
+where they fall, so there is full headroom to raise them.
 
 ---
 
