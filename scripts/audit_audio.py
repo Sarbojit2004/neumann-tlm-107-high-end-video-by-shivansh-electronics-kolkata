@@ -31,10 +31,12 @@ SR = 48000
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SFX_DIR = os.path.join(ROOT, "public", "audio", "sfx")
 BED = os.path.join(ROOT, "public", "audio", "bed-layer1.mp3")
+BED_LF = os.path.join(ROOT, "public", "audio", "bed-layer1-longform.mp3")
 SRC = os.path.join(ROOT, "sound-effects", "ES_Moment - Christoffer Moe Ditlevsen.mp3")
 SFX_TS = os.path.join(ROOT, "src", "lib", "sfx.ts")
 
 REEL_SECONDS = 88.0
+LONGFORM_SECONDS = 298.0
 LOW_SPLIT_HZ = 300.0
 MAX_LOW_SHARE = 0.08
 GAIN_DB = -15.0
@@ -143,6 +145,44 @@ else:
         else:
             print("    -> composition UNMODIFIED (gain + end fades only)")
 
+# -- 1b. LAYER 1 LONG-FORM (looped) ----------------------------------------
+print("\n[1b] LAYER 1 long-form -- same track, 3 s crossfade loop")
+if not os.path.exists(BED_LF):
+    fails.append("Layer 1 long-form OUTPUT missing (run gen_audio.py)")
+else:
+    dlf = dur(BED_LF)
+    print(f"    out dur  : {dlf:.3f} s")
+    if abs(dlf - LONGFORM_SECONDS) > 0.20:
+        fails.append(f"Layer 1 long-form duration {dlf:.3f}s != {LONGFORM_SECONDS}s")
+
+    # the FIRST pass must still be the untouched source
+    a = decode(BED_LF, seconds=6.0, offset=60.0) / (10 ** (GAIN_DB / 20.0))
+    b = decode(SRC, seconds=6.0, offset=60.0)
+    n = min(len(a), len(b))
+    if n > SR:
+        a, b = a[:n], b[:n]
+        denom = np.sqrt(np.mean(b ** 2))
+        err = np.sqrt(np.mean((a - b) ** 2)) / (denom if denom > 1e-9 else 1.0)
+        corr = float(np.corrcoef(a, b)[0, 1])
+        print(f"    integrity: corr={corr:.5f}  rel-err={err:.4f}  (first pass vs source)")
+        if corr < 0.999 or err > 0.05:
+            fails.append(f"Layer 1 long-form first pass altered (corr={corr:.5f})")
+        else:
+            print("    -> first pass UNMODIFIED")
+
+    # the loop seam must not be an audible drop-out or a click. Measure short-
+    # window RMS either side of the 250 s crossfade and require continuity.
+    seam = 250.0
+    pre = decode(BED_LF, seconds=2.0, offset=seam - 6.0)
+    mid = decode(BED_LF, seconds=2.0, offset=seam - 1.0)
+    post = decode(BED_LF, seconds=2.0, offset=seam + 4.0)
+    r = lambda v: 20 * np.log10(np.sqrt(np.mean(v ** 2)) + 1e-12)
+    print(f"    seam RMS : before={r(pre):.1f}  during={r(mid):.1f}  after={r(post):.1f} dBFS")
+    if r(mid) < min(r(pre), r(post)) - 9.0:
+        fails.append("Layer 1 loop seam dips audibly (crossfade too deep)")
+    else:
+        print("    -> loop seam continuous, no drop-out")
+
 # -- 3/4/5/6. LAYER 2 -------------------------------------------------------
 print("\n[2] LAYER 2 -- synthesised transition / foley palette")
 if not os.path.exists(SFX_TS):
@@ -204,6 +244,6 @@ if fails:
     for f in fails:
         print(f"  x {f}")
     sys.exit(1)
-print(f"PASSED -- Layer 1 unmodified + {len(names)} Layer 2 cues valid.")
+print(f"PASSED -- Layer 1 unmodified (88 s + 298 s looped) + {len(names)} Layer 2 cues valid.")
 print("Layer 2 is high-frequency throughout; nothing competes with Layer 1's body.")
 sys.exit(0)

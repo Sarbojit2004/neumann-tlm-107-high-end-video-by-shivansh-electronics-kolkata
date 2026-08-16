@@ -44,8 +44,10 @@ const walk = (dir) => {
 };
 
 const sources = walk(join(ROOT, 'src'));
-const VO = join(ROOT, 'VO_SCRIPT_REEL_NEUMANN_TLM107.md');
-if (existsSync(VO)) sources.push(VO);
+for (const vo of ['VO_SCRIPT_REEL_NEUMANN_TLM107.md', 'VO_SCRIPT_LONGFORM_NEUMANN_TLM107.md']) {
+  const p = join(ROOT, vo);
+  if (existsSync(p)) sources.push(p);
+}
 
 const fails = [];
 const note = (f, msg) => fails.push(`${f.replace(ROOT + '/', '')}: ${msg}`);
@@ -115,9 +117,14 @@ for (const f of sources) {
     if (new RegExp(`\\b${w}\\b`, 'i').test(text)) note(f, `unrelated brand: "${w}"`);
   }
 
-  // logo files must never be referenced
-  if (/NEUMANN BERLIN LOGO|SHIVANSH ELECTRONICS LOGO|logo\/|\blogo\.png\b/i.test(text)) {
-    note(f, 'references a logo file');
+  // Logo files must never be referenced by the REEL, which deliberately uses
+  // neither. The long-form is the reverse: it uses both by design, via
+  // public/logo/*.png prepared by scripts/prep_logos.py. So this check applies
+  // only to reel-side sources.
+  const isLongform =
+    /\/(lf-|LF|Longform)/.test(f) || /scenes\/lf\//.test(f) || /LONGFORM/.test(f);
+  if (!isLongform && /NEUMANN BERLIN LOGO|SHIVANSH ELECTRONICS LOGO|logo\/|\blogo\.png\b/i.test(text)) {
+    note(f, 'reel source references a logo file');
   }
 
   // pricing

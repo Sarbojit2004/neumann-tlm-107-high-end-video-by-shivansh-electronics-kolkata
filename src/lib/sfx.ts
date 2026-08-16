@@ -41,16 +41,44 @@ export const CUE = {
   'finish-wipe': 'audio/sfx/finish-wipe.mp3',
   'spec-mark': 'audio/sfx/spec-mark.mp3',
   'outro-chime': 'audio/sfx/outro-chime.mp3',
+
+  // -- LONG-FORM ADDITIONS.
+  // The 88 s reel carries its whole transition load on the 13 cues above. The
+  // 298 s long-form video is three and a half times longer with far more
+  // chapter breaks, so those alone would become audibly repetitive. These add
+  // variation inside the same physical vocabulary and obey the same spectral
+  // rule -- nothing large or low.
+  'grille-tap-mid': 'audio/sfx/grille-tap-mid.mp3',
+  'grille-tap-soft': 'audio/sfx/grille-tap-soft.mp3',
+  'toggle-click-hard': 'audio/sfx/toggle-click-hard.mp3',
+  'chapter-mark': 'audio/sfx/chapter-mark.mp3',
+  'spec-tick': 'audio/sfx/spec-tick.mp3',
+  'rubber-short': 'audio/sfx/rubber-short.mp3',
+  'air-lift': 'audio/sfx/air-lift.mp3',
+  'panel-slide': 'audio/sfx/panel-slide.mp3',
+  'pattern-morph': 'audio/sfx/pattern-morph.mp3',
 } as const;
 
 export type CueName = keyof typeof CUE;
 
 export const cue = (n: CueName): string => staticFile(CUE[n]);
 
-/** Layer 1 -- the fixed supplied bed. */
+/** Layer 1 -- the fixed supplied bed, trimmed to the 88 s reel. */
 export const BED = 'audio/bed-layer1.mp3';
 export const bed = (): string => staticFile(BED);
 
-/** Silent placeholder; the real narration is recorded separately. */
+/**
+ * Layer 1 for the 298 s long-form video. Same supplied recording, but it has
+ * to LOOP: the source runs 252.168 s, which covers the reel outright but falls
+ * 45.8 s short here. gen_audio.py joins it with a 3 s equal-power crossfade
+ * rather than a butt cut, so there is no seam in the middle of the video.
+ */
+export const BED_LONGFORM = 'audio/bed-layer1-longform.mp3';
+export const bedLongform = (): string => staticFile(BED_LONGFORM);
+
+/** Silent placeholders; the real narration is recorded separately. */
 export const VO = 'vo/voiceover-reel.mp3';
 export const vo = (): string => staticFile(VO);
+
+export const VO_LONGFORM = 'vo/voiceover-longform.mp3';
+export const voLongform = (): string => staticFile(VO_LONGFORM);

@@ -8,14 +8,19 @@
     "typecheck": "tsc --noEmit",
     "audio": "python3 scripts/gen_audio.py && python3 scripts/audit_audio.py",
     "media": "python3 scripts/prep_media.py",
-    "bootstrap": "npm run media && npm run audio",
+    "bootstrap": "npm run media && npm run logos && npm run audio",
     "coverage": "node scripts/coverage.mjs",
     "branding": "node scripts/branding_audit.mjs",
     "stills": "node scripts/stills.mjs",
     "verify": "node scripts/verify_render.mjs",
     "bundlecheck": "node scripts/bundlecheck.mjs",
     "thumb": "remotion still Thumbnail thumbnails/thumbnail-neumann-tlm107-reel.png --image-format=png",
-    "render": "remotion render Reel out/neumann-tlm107-reel.mp4 --codec=h264 --crf=17 --pixel-format=yuv420p"
+    "render": "remotion render Reel out/neumann-tlm107-reel.mp4 --codec=h264 --crf=17 --pixel-format=yuv420p",
+    "render:lf": "remotion render Longform out/neumann-tlm107-longform.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p",
+    "thumb:lf": "remotion still LongformThumbnail thumbnails/thumbnail-neumann-tlm107-longform.png --image-format=png",
+    "logos": "python3 scripts/prep_logos.py",
+    "cadence": "node scripts/branding_cadence.mjs",
+    "coverage:lf": "node scripts/coverage_lf.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.507",

@@ -25,15 +25,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "neumann-tlm107-reel-project.zip")
 
 SKIP_DIRS = {
-    ".git", "node_modules", "stills", ".remotion",
+    ".git", "node_modules", "stills", "stills-lf", ".remotion",
     os.path.join("public", "img"),
     os.path.join("public", "ambient"),
     os.path.join("public", "audio"),
+    os.path.join("public", "ambient-wide"),
+    os.path.join("public", "logo"),
 }
 SKIP_FILES = {
     "neumann-tlm107-reel-project.zip",
     os.path.join("src", "lib", "media.json"),
     os.path.join("out", "range-test.mp4"),
+    os.path.join("out", "lf-range-test.mp4"),
 }
 SKIP_EXT = {".log", ".pyc"}
 
