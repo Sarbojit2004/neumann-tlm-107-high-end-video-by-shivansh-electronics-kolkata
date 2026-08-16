@@ -53,6 +53,8 @@ LAYER1_SRC = os.path.join(ROOT, "sound-effects", "ES_Moment - Christoffer Moe Di
 FPS = 30
 TOTAL_FRAMES = 2640
 REEL_SECONDS = TOTAL_FRAMES / FPS  # 88.0
+LONGFORM_FRAMES = 8940
+LONGFORM_SECONDS = LONGFORM_FRAMES / FPS  # 298.0
 
 rng = np.random.default_rng(107)
 
@@ -449,7 +451,140 @@ def cue_outro_chime():
     return norm(comb_verb(y, delays_ms=(13.1, 21.7, 29.3), fb=0.36, mix=0.26), 0.62)
 
 
+# ---------------------------------------------------------------------------
+# LONG-FORM EXTENSIONS
+#
+# The 88 s reel could carry its whole transition load on 13 cues. The 298 s
+# long-form video is three and a half times longer with far more chapter
+# breaks, so the same 13 would become audibly repetitive. These nine add
+# variation within the SAME physical vocabulary the brief specifies -- damped
+# mechanical clicks, thin metallic grille resonances, rubber elasticity -- and
+# obey the same rule: no large low-frequency whooshes, nothing that muddies
+# Layer 1.
+# ---------------------------------------------------------------------------
+
+def cue_grille_tap_mid():
+    """A fourth grille-tap pitch, sitting between -lo and -hi."""
+    return cue_grille_tap(seed_shift=0.08, bright=1.02, length=0.36, peak=0.60)
+
+
+def cue_grille_tap_soft():
+    """A gentler tap for chapter breaks that should not punctuate hard."""
+    return cue_grille_tap(seed_shift=-0.06, bright=0.94, length=0.30, peak=0.34)
+
+
+def cue_toggle_click_hard():
+    """A firmer detent -- the toggle reaching an end stop."""
+    n = int(0.10 * SR)
+    tt = t(n)
+    burst = noise(n) * env_ad(n, 0.0003, 0.012, 3.2)
+    burst = filt(burst, 3200, 0.9, "hp")
+    burst = filt(burst, 8200, 0.7, "lp")
+    body = modal(n, [1180, 1870, 2940, 4100], [0.020, 0.014, 0.009, 0.006],
+                 [0.60, 0.34, 0.20, 0.11])
+    body *= env_ad(n, 0.0006, 0.055, 2.4)
+    seat = np.sin(2 * math.pi * 360 * tt) * env_ad(n, 0.001, 0.024, 3.0) * 0.18
+    x = burst * 0.78 + body * 0.66 + seat
+    x = filt(x, 180, 0.7, "hp")
+    return norm(comb_verb(x, fb=0.18, mix=0.08), 0.72)
+
+
+def cue_chapter_mark():
+    """Marks a chapter change. Two clean high partials, a fifth apart.
+
+    Deliberately tonal rather than percussive so it reads as punctuation in a
+    long-form structure without ever sounding like a notification chime.
+    """
+    n = int(0.90 * SR)
+    tt = t(n)
+    x = (np.sin(2 * math.pi * 1568 * tt) * 0.5 * np.exp(-tt / 0.42)
+         + np.sin(2 * math.pi * 2349 * tt) * 0.30 * np.exp(-tt / 0.34)
+         + np.sin(2 * math.pi * 3136 * tt) * 0.16 * np.exp(-tt / 0.26))
+    x *= env_ad(n, 0.004, 0.86, 1.4)
+    air = filt(noise(n), 4800, 0.8, "hp") * env_ad(n, 0.003, 0.07, 3.2) * 0.11
+    y = filt(x + air, 900, 0.7, "hp")
+    return norm(comb_verb(y, delays_ms=(11.7, 18.3, 26.1), fb=0.32, mix=0.22), 0.46)
+
+
+def cue_spec_tick():
+    """A smaller sibling of spec-mark, for figures appearing in a run."""
+    n = int(0.14 * SR)
+    tt = t(n)
+    tone = (np.sin(2 * math.pi * 3730 * tt) * 0.5
+            + np.sin(2 * math.pi * 5590 * tt) * 0.2)
+    tone *= env_ad(n, 0.0010, 0.12, 2.8)
+    tick = filt(noise(n), 7600, 0.9, "hp") * env_ad(n, 0.0002, 0.003, 4.0) * 0.24
+    return norm(filt(tone + tick, 1500, 0.7, "hp"), 0.38)
+
+
+def cue_rubber_short():
+    """A brief band flex -- the mount settling rather than being stretched."""
+    n = int(0.30 * SR)
+    tt = t(n)
+    tension = np.clip(tt / (n / SR), 0, 1) ** 0.8
+    imp = np.zeros(n)
+    pos = 0.0
+    while pos < n:
+        i = int(pos)
+        if i < n:
+            imp[i] += rng.uniform(0.4, 0.95)
+        pos += SR / (240.0 + 520.0 * (pos / n))
+    seg = 512
+    out = np.zeros(n)
+    for s0 in range(0, n, seg):
+        s1 = min(n, s0 + seg)
+        out[s0:s1] = filt(imp[s0:s1], 700 + 1100 * tension[s0], 5.0, "bp")
+    x = out * env_ad(n, 0.020, 0.26, 1.6)
+    return norm(comb_verb(filt(x, 300, 0.7, "hp"), fb=0.20, mix=0.10), 0.34)
+
+
+def cue_air_lift():
+    """A rising airy breath for a reveal. Treble only -- explicitly not a whoosh."""
+    n = int(0.85 * SR)
+    x = filt(noise(n), 2000, 0.8, "hp")
+    seg = 512
+    out = np.zeros(n)
+    for s0 in range(0, n, seg):
+        s1 = min(n, s0 + seg)
+        p = s0 / n
+        out[s0:s1] = filt(x[s0:s1], 2600 + 6200 * (p ** 1.2), 2.4, "bp")
+    out *= env_ad(n, 0.18, 0.64, 1.5)
+    y = filt(out, 1400, 0.7, "hp")
+    return norm(comb_verb(y, fb=0.30, mix=0.20), 0.38)
+
+
+def cue_panel_slide():
+    """A card/plate arriving. A short filtered brush, no low content."""
+    n = int(0.34 * SR)
+    x = filt(noise(n), 1800, 0.8, "hp")
+    seg = 256
+    out = np.zeros(n)
+    for s0 in range(0, n, seg):
+        s1 = min(n, s0 + seg)
+        p = s0 / n
+        out[s0:s1] = filt(x[s0:s1], 5200 - 2400 * p, 1.9, "bp")
+    out *= env_ad(n, 0.010, 0.30, 2.0)
+    return norm(filt(out, 1300, 0.7, "hp"), 0.34)
+
+
+def cue_pattern_morph():
+    """Under the morphing polar diagram. A slow two-tone glide, thin and high."""
+    n = int(1.10 * SR)
+    tt = t(n)
+    g = np.linspace(0, 1, n)
+    f1 = 1400 + 700 * g
+    f2 = 2100 + 950 * g
+    ph1 = np.cumsum(2 * math.pi * f1 / SR)
+    ph2 = np.cumsum(2 * math.pi * f2 / SR)
+    x = np.sin(ph1) * 0.30 + np.sin(ph2) * 0.16
+    x *= env_ad(n, 0.22, 0.86, 1.3)
+    air = filt(noise(n), 5200, 0.8, "hp") * env_ad(n, 0.20, 0.80, 1.4) * 0.07
+    y = filt(x + air, 1100, 0.7, "hp")
+    return norm(comb_verb(y, fb=0.28, mix=0.18), 0.32)
+
+
 CUES = {
+    # -- shared with the reel -------------------------------------------
     "toggle-click": cue_toggle_click,
     "toggle-click-soft": cue_toggle_click_soft,
     "led-step": cue_led_step,
@@ -463,6 +598,16 @@ CUES = {
     "finish-wipe": cue_finish_wipe,
     "spec-mark": cue_spec_mark,
     "outro-chime": cue_outro_chime,
+    # -- long-form additions --------------------------------------------
+    "grille-tap-mid": cue_grille_tap_mid,
+    "grille-tap-soft": cue_grille_tap_soft,
+    "toggle-click-hard": cue_toggle_click_hard,
+    "chapter-mark": cue_chapter_mark,
+    "spec-tick": cue_spec_tick,
+    "rubber-short": cue_rubber_short,
+    "air-lift": cue_air_lift,
+    "panel-slide": cue_panel_slide,
+    "pattern-morph": cue_pattern_morph,
 }
 
 
@@ -488,26 +633,81 @@ def build_layer1():
     return out
 
 
-def build_silent_vo():
-    """Silent placeholder so the composition renders before VO is recorded."""
-    out = os.path.join(VO_DIR, "voiceover-reel.mp3")
-    if os.path.exists(out):
-        return out
+def build_layer1_longform():
+    """Layer 1 for the 298 s long-form video -- the same supplied track, LOOPED.
+
+    This is the one place the two deliverables genuinely differ. The source
+    runs 252.168 s, which comfortably covers the 88 s reel outright but falls
+    45.8 s short of 298 s, so the long-form bed has to loop.
+
+    A butt-joined loop would put an audible seam right in the middle of the
+    video, so the join is a 3 s equal-power CROSSFADE instead: the track plays
+    from 0 to 250 s, then crossfades into the same track again from 150 s and
+    runs 51 s more. 250 + 51 - 3 = 298.000 s exactly.
+
+    This is still not a modification of the composition -- no EQ, no
+    compression, no layering, no substitution. The only operations are a cut,
+    a crossfade between two passages of the same recording, one constant gain
+    and end fades. audit_audio.py verifies the first pass sample-for-sample
+    against the source.
+    """
+    if not os.path.exists(LAYER1_SRC):
+        raise SystemExit(f"Layer 1 source missing: {LAYER1_SRC}")
+    out = os.path.join(BED_DIR, "bed-layer1-longform.mp3")
+
+    head_end = 250.0     # end of the first pass
+    tail_start = 150.0   # where the second pass is picked up
+    xfade = 3.0
+    tail_len = LONGFORM_SECONDS - head_end + xfade  # 51.0
+
+    filt_graph = (
+        f"[0:a]atrim=0:{head_end},asetpts=PTS-STARTPTS[a];"
+        f"[1:a]atrim={tail_start}:{tail_start + tail_len},asetpts=PTS-STARTPTS[b];"
+        f"[a][b]acrossfade=d={xfade}:c1=tri:c2=tri[x];"
+        f"[x]volume=-15dB,"
+        f"afade=t=in:st=0:d=1.5,"
+        f"afade=t=out:st={LONGFORM_SECONDS - 3.0:.3f}:d=3.0[out]"
+    )
     subprocess.run(
         [FFMPEG, "-y", "-loglevel", "error",
-         "-f", "lavfi", "-i", f"anullsrc=r={SR}:cl=stereo",
-         "-t", f"{REEL_SECONDS:.3f}",
-         "-codec:a", "libmp3lame", "-b:a", "96k", out],
+         "-i", LAYER1_SRC, "-i", LAYER1_SRC,
+         "-filter_complex", filt_graph, "-map", "[out]",
+         "-t", f"{LONGFORM_SECONDS:.3f}",
+         "-codec:a", "libmp3lame", "-b:a", "224k", "-ar", str(SR),
+         out],
         check=True,
     )
     return out
+
+
+def build_silent_vo():
+    """Silent placeholders so both compositions render before VO is recorded."""
+    made = []
+    for name, seconds in (
+        ("voiceover-reel.mp3", REEL_SECONDS),
+        ("voiceover-longform.mp3", LONGFORM_SECONDS),
+    ):
+        out = os.path.join(VO_DIR, name)
+        made.append(out)
+        if os.path.exists(out):
+            continue
+        subprocess.run(
+            [FFMPEG, "-y", "-loglevel", "error",
+             "-f", "lavfi", "-i", f"anullsrc=r={SR}:cl=stereo",
+             "-t", f"{seconds:.3f}",
+             "-codec:a", "libmp3lame", "-b:a", "96k", out],
+            check=True,
+        )
+    return made
 
 
 def main():
     print(f"ffmpeg: {FFMPEG}")
     print("\n-- LAYER 1 (supplied, unmodified composition) --")
     p = build_layer1()
-    print(f"   {os.path.relpath(p, ROOT)}")
+    print(f"   {os.path.relpath(p, ROOT):<44} 88.000 s  (no loop needed)")
+    p2 = build_layer1_longform()
+    print(f"   {os.path.relpath(p2, ROOT):<44} 298.000 s (3 s crossfade loop)")
 
     print("\n-- LAYER 2 (synthesised here, numpy/scipy) --")
     for name, fn in CUES.items():
@@ -517,9 +717,9 @@ def main():
         kb = os.path.getsize(mp3) // 1024
         print(f"   {name:<20} {kb:>4} KB")
 
-    print("\n-- VO placeholder --")
-    v = build_silent_vo()
-    print(f"   {os.path.relpath(v, ROOT)}")
+    print("\n-- VO placeholders --")
+    for v in build_silent_vo():
+        print(f"   {os.path.relpath(v, ROOT)}")
     print(f"\nDone. {len(CUES)} Layer 2 cues.")
 
 

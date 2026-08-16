@@ -38,7 +38,8 @@ from scipy import ndimage
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IMG_OUT = os.path.join(ROOT, "public", "img")
 AMB_OUT = os.path.join(ROOT, "public", "ambient")
-for d in (IMG_OUT, AMB_OUT):
+AMBW_OUT = os.path.join(ROOT, "public", "ambient-wide")
+for d in (IMG_OUT, AMB_OUT, AMBW_OUT):
     os.makedirs(d, exist_ok=True)
 
 # Reel paper ground -- keep in sync with src/lib/theme.ts C.paper
@@ -181,6 +182,36 @@ def upscale(im, target_long=1500):
     return im.resize((max(1, int(w * s)), max(1, int(h * s))), Image.LANCZOS)
 
 
+def make_ambient_wide(im, size=(1440, 810)):
+    """Landscape variant of the ambient plate, for the 1920x1080 long-form.
+
+    Same dissolve treatment, but composed 16:9 so it can sit as a full-bleed
+    background wash behind the long-form's content instead of being squeezed
+    into the reel's narrow top/bottom bands. The square plates are kept
+    untouched so the already-rendered reel stays byte-identical.
+    """
+    im = im.convert("RGB")
+    w, h = im.size
+    target_ar = size[0] / size[1]
+    # centre-crop to 16:9 before scaling, so nothing is stretched
+    if w / h > target_ar:
+        nw = int(h * target_ar)
+        im = im.crop(((w - nw) // 2, 0, (w + nw) // 2, h))
+    else:
+        nh = int(w / target_ar)
+        im = im.crop((0, (h - nh) // 2, w, (h + nh) // 2))
+    im = im.resize(size, Image.LANCZOS)
+    im = im.filter(ImageFilter.GaussianBlur(size[0] * 0.055))
+    im = im.filter(ImageFilter.GaussianBlur(size[0] * 0.028))
+    im = ImageEnhance.Color(im).enhance(0.10)
+    im = ImageEnhance.Contrast(im).enhance(0.42)
+    im = ImageEnhance.Brightness(im).enhance(1.20)
+    a = np.asarray(im).astype(np.float32)
+    paper = np.array(PAPER, dtype=np.float32)
+    a = a * 0.22 + paper * 0.78
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGB")
+
+
 def make_ambient(im, size=(760, 760)):
     """Reduce a frame to unidentifiable paper-tinted texture.
 
@@ -243,6 +274,8 @@ def main():
             print(f"{slug:<18}{tier:>5}{src_px:>13}{im.size[0]}x{im.size[1]:<8}  "
                   f"{'yes' if keyed else '-':<6} {note}")
         else:
+            wide = make_ambient_wide(im)
+            wide.save(os.path.join(AMBW_OUT, slug + ".jpg"), "JPEG", quality=88, optimize=True)
             im = make_ambient(im)
             out = os.path.join(AMB_OUT, slug + ".jpg")
             im.save(out, "JPEG", quality=88, optimize=True)
@@ -265,7 +298,7 @@ def main():
     keyed = sum(1 for x in manifest["tierA"] if x["keyed"])
     print("-" * 108)
     print(f"Tier A product images : {a:>3}   ({keyed} background-keyed)")
-    print(f"Ambient texture plates: {b:>3}")
+    print(f"Ambient texture plates: {b:>3}   (square for the reel + 16:9 for the long-form)")
     print(f"TOTAL                 : {a + b:>3}  (must be 55)")
     return 0 if a + b == 55 else 1
 

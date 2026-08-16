@@ -54,9 +54,22 @@ else if (thumb.width !== 1080 || thumb.height !== 1920) {
   fails.push(`Thumbnail is ${thumb.width}x${thumb.height}, expected 1080x1920`);
 }
 
+const lf = comps.find((c) => c.id === 'Longform');
+if (!lf) fails.push('composition "Longform" not registered');
+else {
+  if (lf.width !== 1920 || lf.height !== 1080) fails.push(`Longform is ${lf.width}x${lf.height}, expected 1920x1080`);
+  if (lf.fps !== 30) fails.push(`Longform is ${lf.fps} fps, expected 30`);
+  if (lf.durationInFrames !== 8940) fails.push(`Longform is ${lf.durationInFrames} frames, expected 8940`);
+}
+const lft = comps.find((c) => c.id === 'LongformThumbnail');
+if (!lft) fails.push('composition "LongformThumbnail" not registered');
+else if (lft.width !== 1920 || lft.height !== 1080) {
+  fails.push(`LongformThumbnail is ${lft.width}x${lft.height}, expected 1920x1080`);
+}
+
 if (fails.length) {
   console.log('\nFAILED:');
   for (const f of fails) console.log(`  x ${f}`);
   process.exit(1);
 }
-console.log('\nPASSED — bundle clean, Reel is 1080x1920 @30fps, 2640 frames (88.000 s).');
+console.log('\nPASSED — bundle clean. Reel 1080x1920/2640f (88.000 s), Longform 1920x1080/8940f (298.000 s).');
