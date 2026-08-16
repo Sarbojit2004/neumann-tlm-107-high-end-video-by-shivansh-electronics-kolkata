@@ -210,18 +210,54 @@ in the outro, where a viewer has time to read it.
 
 ### Logo preparation
 
-Both supplied files ship with an opaque white rounded-rectangle plate baked in,
-which the spec forbids ("not enclosed in a white box, card, or plate"), and the
-Shivansh file carries the tagline "Eastern India's Premier Audio Destination",
-which the spec also excludes.
+**Both marks are used COMPLETE. Nothing is cropped.** The Shivansh lockup
+renders in full at 2336×678 — globe device with its inner script, two-line
+wordmark, ™, and the "Eastern India's Premier Audio Destination" tagline.
 
-`scripts/prep_logos.py` fixes both. The plate is keyed to transparency using
-only white regions **connected to the image border**, so white enclosed inside
-the artwork — the Neumann diamond's interior, the counters inside letterforms —
-survives intact. The tagline is cropped at the measured gap between the
-wordmark and the tagline (the ink profile of the wordmark column shows three
-bands: "Shivansh" at y 0–236, "Electronics" at y 295–456, tagline at y
-551–714; the cut is at 0.70). What remains is a complete, standard logo lockup.
+The one problem with the supplied files is that both ship with an opaque white
+rounded-rectangle plate baked in, which the spec forbids ("not enclosed in a
+white box, card, or plate"). `scripts/prep_logos.py` keys that plate to
+transparency using only white regions **connected to the image border**, so
+white enclosed inside the artwork — the Neumann diamond's interior, the
+counters inside letterforms, the gaps between the globe's halftone dots —
+survives intact. No pixel of either mark is altered; only the empty surround is
+removed, so each logo composites straight onto the light ground with no card
+behind it.
+
+> **Corrected 2026-08-16.** An earlier revision cropped the Shivansh file to
+> 0.70 of its height to strip the tagline. That cut also sliced through the
+> globe, removing its lower third and the script curving inside it, and the
+> delivered video and thumbnail carried the damaged mark throughout. The full
+> artwork is now used verbatim.
+
+### Sizing after the restore
+
+The complete lockup is 3.45:1 where the cropped one was 4.86:1 — 41 % taller at
+any given width — and its tagline band is only **9.6 %** of the artwork's
+height (measured: wordmark decks at y 51–221 and y 275–440, tagline at y
+531–596). Sizing by eye off the wordmark would leave the tagline an illegible
+grey smear, so every width is set from the tagline's rendered cap height
+instead:
+
+| Form | Logo width | Rendered height | Tagline cap height |
+|---|---|---|---|
+| Corner mark | 400 px | 116 px | 11.1 px |
+| Lower third | 400 px | 116 px | 11.1 px |
+| Branding beat | 450 px | 131 px | 12.5 px |
+| Thumbnail | 400 px | 116 px | 11.1 px |
+
+The **corner mark moved from top-right into the reserved bottom band**. The old
+position worked only while the mark was squat; at 116 px tall it landed on the
+black capsule macro (C2), the transformerless hero (C3) and the grille macro
+(C7), printing a black logo over black photography. The bottom band is the one
+region structurally guaranteed free of chapter content, and no two branding
+slots are ever on screen together — 23 slots, zero temporal overlap, minimum
+gap 70 frames — so all three forms share it and stay distinct by position:
+mark right, lower third left, beat full-width centred.
+
+In the thumbnail the two marks are matched on **wordmark** height, not overall
+height: Shivansh stacks three decks where Neumann is a single line, so equal
+box heights would leave the Neumann mark looking oversized.
 
 ---
 

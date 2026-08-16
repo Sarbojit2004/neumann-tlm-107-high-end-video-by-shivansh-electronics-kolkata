@@ -26,6 +26,8 @@ const ffmpeg = [
 
 const input = process.argv[2] ?? resolve(ROOT, 'out', 'neumann-tlm107-reel.mp4');
 const output = process.argv[3] ?? input;
+// Target length follows the deliverable being finalized.
+const SECONDS = /longform/i.test(input) ? '298.000' : '88.000';
 const tmp = input.replace(/\.mp4$/, '.tmp.mp4');
 
 if (!existsSync(input)) {
@@ -38,7 +40,7 @@ execFileSync(
   [
     '-y', '-loglevel', 'error',
     '-i', input,
-    '-t', '88.000',
+    '-t', SECONDS,
     '-c:v', 'copy',
     '-c:a', 'aac', '-b:a', '192k',
     '-movflags', '+faststart',
@@ -53,4 +55,6 @@ if (output === input) {
 } else {
   renameSync(tmp, output);
 }
-console.log(`finalized -> ${output.replace(ROOT + '/', '')} (hard 88.000 s cut, video stream copied)`);
+console.log(
+  `finalized -> ${output.replace(ROOT + '/', '')} (hard ${SECONDS} s cut, video stream copied)`,
+);

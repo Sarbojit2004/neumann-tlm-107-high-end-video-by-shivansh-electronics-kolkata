@@ -13,6 +13,13 @@ import {fileURLToPath} from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const target = process.argv[2] ?? resolve(ROOT, 'out', 'neumann-tlm107-reel.mp4');
 
+// Two deliverables with different geometry, so the expected shape is derived
+// from which file is being probed rather than hardcoded to the reel.
+const isLongform = /longform/i.test(target);
+const EXPECT = isLongform
+  ? {w: 1920, h: 1080, frames: 8940, seconds: 298.0, name: 'Longform'}
+  : {w: 1080, h: 1920, frames: 2640, seconds: 88.0, name: 'Reel'};
+
 const SCRATCH = '/tmp/claude-0/-home-user/b7c7b719-b725-5bcc-ae76-95b988bf89e8/scratchpad';
 const ffprobe = [
   process.env.FFPROBE_BIN,
@@ -48,9 +55,13 @@ else {
   const frames = parseInt(v.nb_frames ?? '0', 10) || Math.round(dur * fps);
   console.log(`  video       : ${v.codec_name} ${v.width}x${v.height} @ ${fps}fps, ${frames} frames`);
   console.log(`  pix_fmt     : ${v.pix_fmt}`);
-  if (v.width !== 1080 || v.height !== 1920) fails.push(`resolution ${v.width}x${v.height}, expected 1080x1920`);
+  if (v.width !== EXPECT.w || v.height !== EXPECT.h) {
+    fails.push(`resolution ${v.width}x${v.height}, expected ${EXPECT.w}x${EXPECT.h}`);
+  }
   if (fps !== 30) fails.push(`frame rate ${fps}, expected 30`);
-  if (Math.abs(frames - 2640) > 2) fails.push(`${frames} frames, expected 2640 (±2)`);
+  if (Math.abs(frames - EXPECT.frames) > 2) {
+    fails.push(`${frames} frames, expected ${EXPECT.frames} (±2)`);
+  }
   if (v.pix_fmt !== 'yuv420p') fails.push(`pix_fmt ${v.pix_fmt}, expected yuv420p`);
 }
 
@@ -60,7 +71,9 @@ else {
   if (parseInt(a.channels, 10) < 2) fails.push('audio is not stereo');
 }
 
-if (Math.abs(dur - 88.0) > 0.15) fails.push(`duration ${dur.toFixed(3)} s, expected 88.000 s (±0.15)`);
+if (Math.abs(dur - EXPECT.seconds) > 0.15) {
+  fails.push(`duration ${dur.toFixed(3)} s, expected ${EXPECT.seconds.toFixed(3)} s (±0.15)`);
+}
 if (size < 1_000_000) fails.push('file suspiciously small');
 
 console.log('='.repeat(70));
@@ -69,4 +82,7 @@ if (fails.length) {
   for (const f of fails) console.log(`  x ${f}`);
   process.exit(1);
 }
-console.log('PASSED — 1080x1920, 30 fps, 2640 frames, 88.000 s, video + audio present.');
+console.log(
+  `PASSED — ${EXPECT.name}: ${EXPECT.w}x${EXPECT.h}, 30 fps, ${EXPECT.frames} frames, ` +
+    `${EXPECT.seconds.toFixed(3)} s, video + audio present.`,
+);
