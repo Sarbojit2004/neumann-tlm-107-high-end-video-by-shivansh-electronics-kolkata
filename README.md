@@ -217,12 +217,21 @@ The **long-form uses both, repeatedly**, with Shivansh Electronics appearing
 roughly every 20–28 s across three rotating forms (corner mark, lower third,
 full band) and Neumann five times including mid-video.
 
-Both supplied logo files ship with a baked white rounded-rectangle plate, and
-the Shivansh file carries a tagline. The spec forbids both, so
-`scripts/prep_logos.py` keys the plate to transparency — only white *connected
-to the border*, so white inside the artwork survives — and crops the tagline at
-the measured gap between wordmark and tagline. Every logo therefore renders
-directly on the ground, never boxed.
+**Both marks are used complete — nothing is cropped.** The Shivansh lockup is
+the full registered mark: globe device, two-line wordmark, and the "Eastern
+India's Premier Audio Destination" tagline. The only processing
+`scripts/prep_logos.py` applies is keying away the baked white
+rounded-rectangle plate both files ship with, using only white *connected to
+the image border* — so white enclosed inside the artwork survives and no pixel
+of either mark is altered. Every logo therefore renders directly on the ground,
+never boxed.
+
+Restoring the full lockup changed the Shivansh aspect ratio from 4.86:1 to
+3.45:1, so all three branding forms were resized off the **tagline's** rendered
+cap height (`width × 0.0278`, targeting ≥ 11 px at 1080p) rather than off the
+wordmark, and the corner mark moved from the unreserved top-right corner into
+the reserved bottom band — at its new height it had begun landing on the dark
+macro photography in C2, C3 and C7.
 
 ### Sound
 

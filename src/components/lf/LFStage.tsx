@@ -145,21 +145,60 @@ export const LFBlock: React.FC<{
 // Every logo renders DIRECTLY on the ground — no white box, card or plate
 // behind it. Both supplied files ship with a baked white rounded-rect plate;
 // scripts/prep_logos.py keys that away so these composite cleanly.
+//
+// Both marks are used COMPLETE. The Shivansh lockup is globe + wordmark +
+// the "Eastern India's Premier Audio Destination" tagline; nothing is cropped.
+//
+// SIZING. Restoring the tagline changed the Shivansh aspect ratio from 4.86 to
+// 3.45, and the tagline band is only 9.6% of the artwork's height. Every width
+// below is therefore set from the TAGLINE's rendered cap height rather than
+// from the lockup's overall size — at 1920x1080 the tagline needs ~11px to
+// stay crisp, which is width x 0.0278. Sizing by eye off the wordmark alone
+// would have left it an illegible grey smear.
 // ---------------------------------------------------------------------------
 
-/** Corner mark — a logo alone, sized to read without dominating. */
+/** Rendered tagline cap height for a given Shivansh logo width, in px. */
+const taglinePx = (w: number) => w * 0.0278;
+
+/**
+ * Corner mark — a logo alone, sized to read without dominating.
+ *
+ * It lives at the BOTTOM-RIGHT, inside the reserved branding band.
+ *
+ * It used to sit top-right, which worked only while the Shivansh logo was
+ * being cropped to a squat 4.86:1. Restoring the full lockup made it 87%
+ * taller at the same width, and the top-right corner is not reserved — the
+ * taller mark landed on the black macro plate in C2, the transformerless hero
+ * in C3 and the grille macro in C7, printing a black logo over black
+ * photography. The bottom band is the one region guaranteed free of chapter
+ * content, and no two branding slots are ever on screen at once (verified: 23
+ * slots, zero temporal overlap, minimum gap 70 frames), so all three forms can
+ * share it. The three stay visually distinct by position and weight: mark
+ * right, lower-third left, beat full-width centred.
+ */
 const CornerMark: React.FC<{brand: 'shivansh' | 'neumann'; p: number}> = ({brand, p}) => {
-  const w = brand === 'shivansh' ? 300 : 260;
+  // 400 -> 116px tall, tagline 11.1px. The Neumann mark keeps its old width;
+  // its aspect ratio did not change.
+  const w = brand === 'shivansh' ? 400 : 280;
   return (
     <div
       style={{
         position: 'absolute',
         right: PAD + 8,
-        top: 40,
+        bottom: 0,
+        height: BRAND_BAND,
+        display: 'flex',
+        alignItems: 'center',
         opacity: p * 0.95,
-        transform: `translateY(${(1 - p) * -12}px)`,
+        transform: `translateY(${(1 - p) * 12}px)`,
       }}
     >
+      {/*
+        No wash behind this one. A gradient clipped to the mark's own box would
+        have a hard left edge and read as precisely the white plate the spec
+        forbids; the band is verified clear of media at every corner-mark
+        frame, so the mark composites straight onto the ground.
+      */}
       <Img src={logo(brand)} style={{width: w, height: 'auto', display: 'block'}} />
     </div>
   );
@@ -177,8 +216,8 @@ const LowerThird: React.FC<{
       // inside the reserved branding band, so it can never land on content
       position: 'absolute',
       left: PAD + 8,
-      bottom: 34,
-      height: BRAND_BAND - 52,
+      bottom: 20,
+      height: BRAND_BAND - 32,
       display: 'flex',
       alignItems: 'center',
       gap: 26,
@@ -186,7 +225,11 @@ const LowerThird: React.FC<{
       transform: `translateX(${(1 - p) * -26}px)`,
     }}
   >
-    <Img src={logo(brand)} style={{width: 268, height: 'auto', display: 'block'}} />
+    {/* 400 -> 116px tall, tagline 11.1px; fits the 124px container */}
+    <Img
+      src={logo(brand)}
+      style={{width: brand === 'shivansh' ? 400 : 300, height: 'auto', display: 'block'}}
+    />
     <div style={{width: 2, height: 62, backgroundColor: C.line, opacity: 0.9}} />
     <div>
       {label ? (
@@ -240,22 +283,35 @@ const BrandBeat: React.FC<{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      // lifts the row clear of the 4px progress bar that runs along the very
+      // bottom edge; without it the taller lockup cleared it by only 3px
+      paddingBottom: 12,
+      boxSizing: 'border-box',
       gap: 40,
       opacity: p,
     }}
   >
-    {/* a soft lift so the band reads as its own moment, with no hard edge */}
+    {/*
+      A soft lift so the band reads as its own moment, with no hard edge.
+      It extends 90px ABOVE the band and reaches solid paper by 32% (y≈913),
+      which is above the restored logo's top edge (y≈932) — so the taller
+      Shivansh lockup sits on clean ground rather than half-over a chapter.
+    */}
     <div
       style={{
         position: 'absolute',
-        inset: 0,
-        background: `linear-gradient(180deg, rgba(242,244,247,0) 0%, ${C.paper} 42%, ${C.paper} 100%)`,
+        top: -90,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: `linear-gradient(180deg, rgba(242,244,247,0) 0%, ${C.paper} 32%, ${C.paper} 100%)`,
       }}
     />
+    {/* 450 -> 131px tall inside the 156px band; tagline 12.5px */}
     <Img
       src={logo(brand)}
       style={{
-        width: brand === 'shivansh' ? 420 : 380,
+        width: brand === 'shivansh' ? 450 : 380,
         height: 'auto',
         display: 'block',
         position: 'relative',

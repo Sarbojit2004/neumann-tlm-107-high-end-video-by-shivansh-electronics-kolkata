@@ -12,11 +12,10 @@ be fixed first:
    TO THE BORDER are removed, so white enclosed inside the artwork (the
    Neumann diamond's interior, counters inside letterforms) survives intact.
 
-2. BAKED TAGLINE. The Shivansh Electronics file carries the tagline "Eastern
-   India's Premier Audio Destination" beneath the wordmark. The spec allows no
-   tagline anywhere beyond the "Authorized Partner" designation, so it is
-   cropped away. What remains -- the globe mark plus the two-line wordmark --
-   is a complete, standard logo lockup and reads correctly at any size.
+NOTHING IS CROPPED. Both marks are used in full, exactly as supplied --
+globe device, wordmark and the "Eastern India's Premier Audio Destination"
+tagline all intact. The keying above is the only processing applied, and it
+touches no pixel of the artwork itself.
 
 Both outputs are written as RGBA PNGs that composite cleanly straight onto the
 light paper ground with no visible edge.
@@ -36,14 +35,18 @@ os.makedirs(OUT, exist_ok=True)
 
 SOURCES = [
     # (source file, output slug, fraction of height to KEEP from the top)
+    #
+    # BOTH logos are used COMPLETE — keep = 1.0, no cropping of any kind.
+    #
+    # An earlier revision cropped the Shivansh lockup to 0.70 of its height to
+    # strip the "Eastern India's Premier Audio Destination" tagline. That was
+    # wrong twice over: it removed a permanent part of the registered mark, and
+    # the cut line ran straight through the globe device, chopping off its
+    # lower third and the script "Shivansh Electronics" curving inside it. The
+    # result read as a damaged logo. The full supplied artwork is now used
+    # verbatim, tagline and globe intact.
     ("NEUMANN BERLIN LOGO.png", "neumann", 1.0),
-    # Crop the baked tagline off the bottom of the Shivansh lockup. Measuring
-    # the ink profile of the wordmark column gives three bands: "Shivansh"
-    # (y 0-236), "Electronics" (y 295-456) and the tagline (y 551-714). 0.70
-    # cuts through the clear gap between the wordmark and the tagline; an
-    # earlier 0.815 sliced through the tagline's own glyphs and left their
-    # tops visible.
-    ("SHIVANSH ELECTRONICS LOGO FOR VIDEO.png", "shivansh", 0.70),
+    ("SHIVANSH ELECTRONICS LOGO FOR VIDEO.png", "shivansh", 1.0),
 ]
 
 

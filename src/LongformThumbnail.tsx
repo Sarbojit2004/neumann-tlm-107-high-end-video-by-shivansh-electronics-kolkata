@@ -107,23 +107,31 @@ export const LongformThumbnail: React.FC = () => (
       </div>
     </div>
 
-    {/* ---- both logos, directly on the ground, no plate --------------- */}
+    {/* ---- both logos, complete and directly on the ground, no plate ---
+      The Shivansh lockup is the full registered mark — globe, wordmark and
+      the "Eastern India's Premier Audio Destination" tagline. It is sized so
+      the tagline renders at ~11px (400 x 0.0278), which is what a thumbnail
+      needs for it to survive at full size. The two widths are matched on
+      WORDMARK height, not overall height: Shivansh stacks three decks where
+      Neumann is a single line, so equal box heights would leave the Neumann
+      mark looking oversized.
+    */}
     <div
       style={{
         position: 'absolute',
         left: SAFE.x,
-        top: SAFE.y + 726,
+        top: SAFE.y + 716,
         display: 'flex',
         alignItems: 'center',
         gap: 34,
       }}
     >
-      <Img src={logo('neumann')} style={{width: 250, height: 'auto', display: 'block'}} />
-      <div style={{width: 2, height: 62, backgroundColor: C.line}} />
-      <Img src={logo('shivansh')} style={{width: 262, height: 'auto', display: 'block'}} />
+      <Img src={logo('neumann')} style={{width: 300, height: 'auto', display: 'block'}} />
+      <div style={{width: 2, height: 72, backgroundColor: C.line}} />
+      <Img src={logo('shivansh')} style={{width: 400, height: 'auto', display: 'block'}} />
     </div>
 
-    <div style={{position: 'absolute', left: SAFE.x, top: SAFE.y + 830, width: LEFT_W}}>
+    <div style={{position: 'absolute', left: SAFE.x, top: SAFE.y + 856, width: LEFT_W}}>
       <Micro size={18} color={C.inkDim} tracking={3.0}>
         {PARTNER}
       </Micro>
