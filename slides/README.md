@@ -7,8 +7,9 @@ Electronics, Kolkata — Neumann's Authorized Partner.
 |---|---|
 | Canvas | 2160 × 2160 px, tagged 300 DPI (7.2 in square) |
 | Format | PNG (crisp logo/type edges, no JPEG ringing) |
-| Typefaces | Inter (200–900) and JetBrains Mono (400–800) — two families total |
-| Palette | Sampled from the product photography, not invented |
+| Typefaces | Archivo (300–900) and Fraunces (300–800) — the MOTU M-Series repo's own system |
+| Ground | Warm beige stock ruled as a spreadsheet, 54 px cells, heavier rule every 6 |
+| Marks | Real logos and real brand-colour icons — nothing recoloured or redrawn |
 
 ## The ten
 
@@ -27,12 +28,25 @@ Electronics, Kolkata — Neumann's Authorized Partner.
 
 ## Branding block
 
-Every slide carries the same block, drawn once by `build/lib/brandblock.py`:
-both logos, the authorized-partner line, the primary URL, the Facebook,
-Instagram and YouTube handles, and all three WhatsApp numbers grouped as one
-cluster under a single glyph. Social icons are the client's own supplied
-assets from `all-icons/`, reduced to single-tone glyphs in the palette rather
-than their multicolour brand versions.
+Every slide carries the same block, drawn once by `build/lib/brandblock2.py`:
+both logos in their true colours, the authorized-partner line, the primary
+URL, the social handles in the fixed order **YouTube, Instagram, Facebook,
+LinkedIn**, and all three WhatsApp numbers grouped as one cluster under a
+single glyph. Every icon is the client's own asset from `all-icons/` at full
+brand colour; only the white carrier plate (logos) or the painted checkerboard
+(website icon) is keyed away.
+
+### Contrast
+
+Text tones were measured against the beige ground, not guessed:
+
+| Token | Use | Ratio on beige |
+|---|---|---|
+| `INK` #1A1815 | headlines, figures | 14.6:1 |
+| `INK2` #4A443B | body, secondary | 7.9:1 |
+| `MUTED` #6E6659 | small labels | 4.7:1 |
+| `RED` #A6272C | accent type | 5.9:1 |
+| `ORANGE` #E68B0C | **graphic accent only** — rules and ticks, never text | 2.0:1 |
 
 ## Content discipline
 
@@ -47,6 +61,9 @@ microphone — including Neumann's own catalogue — appears. No price is shown.
 
 ```bash
 pip install Pillow numpy scipy fonttools brotli
-python3 build/lib/prep.py     # icon glyphs + reversed logos
-python3 build/slides.py       # all ten
+python3 build/lib/prep2.py    # colour logos + colour icons
+python3 build/slides2.py      # all ten
 ```
+
+Fonts are vendored under `build/fonts/` as static instances of the Archivo and
+Fraunces variable faces from the MOTU M-Series repository's `_shared/fonts/`.
