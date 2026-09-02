@@ -27,3 +27,6 @@ public/audio/
 #   public/fonts/*.woff2       the vendored type system
 #   public/vo/voiceover-reel.mp3  the silent VO placeholder
 #   src/lib/font-data.ts       base64-inlined faces
+
+# slide build intermediates
+slides/build/assets/
